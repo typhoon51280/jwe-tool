@@ -98,7 +98,7 @@ jobs:
       - name: Publish Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: ~/artifacts/**/*.zip,~/artifacts/**/*.tar.gz
+          artifacts: ~/artifacts/**/*
           allowUpdates: true
           generateReleaseNotes: true
           replacesArtifacts: true
