@@ -9,11 +9,63 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# on:
+#   push:
+#     tags:
+#       - 'v*'
+      
 jobs:
 
   build:
-    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        system:
+          - darwin
+          - windows
+          - linux
+        arch:
+         - x86_64
+        include:
+          - system: windows
+            os: windows-latest
+            vendor: ""
+            abi: ""
+            artifact_name: jwe-tool
+            artifact_extension: .exe
+            archive_type: zip
+            archive_extension: .zip
+          - system: darwin
+            os: macos-latest
+            vendor: ""
+            abi: ""
+            artifact_name: jwe-tool
+            artifact_extension: ""
+            archive_type: tar
+            archive_extension: .tar.gz
+          - system: linux
+            os: ubuntu-latest
+            vendor: unknown
+            abi: ""
+            artifact_name: scanner-cmd
+            artifact_extension: ""
+            archive_type: tar
+            archive_extension: .tar.gz
+        exclude:
+          - system: darwin
+            arch: i686
+          - system: linux
+            arch: i686
+
+    runs-on: ${{ matrix.os }}
+    
+#     env:
+#       CARGO_TERM_COLOR: always
+#       CARGO_BUILD_TARGET: ${{matrix.arch}}-${{matrix.vendor}}-${{matrix.system}}${{matrix.abi}}
+#       RUSTFLAGS: ${{matrix.rustflags}}
+
     steps:
+
     - uses: actions/checkout@v3
 
     - name: Set up Go
@@ -22,7 +74,46 @@ jobs:
         go-version: 1.19
 
     - name: Build
-      run: go build -v ./...
+      run: |
+        go build -v ./...
+        echo "::set-output name=archive_name::${{artifact_name}}-${{matrix.system}}${{matrix.arch}}${{matrix.vendor}}${{matrix.abi}}"
+        echo "::set-output name=archive_file::${{artifact_name}}-${{matrix.system}}${{matrix.arch}}${{matrix.vendor}}${{matrix.abi}}${{matrix.archive_extension}}"
+        echo "::set-output name=archive_dir::./"
 
     - name: Test
       run: go test -v ./...
+      
+    - name: Compress Artifact
+      uses: thedoctor0/zip-release@master
+      with:
+        type: ${{matrix.archive_type}}
+        directory: ${{steps.build.outputs.archive_dir}}
+        filename: ${{steps.build.outputs.archive_file}}
+        path: ${{matrix.artifact_name}}${{matrix.artifact_extension}}
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{steps.build.outputs.archive_name}}
+        path: ${{steps.build.outputs.archive_dir}}/${{steps.build.outputs.archive_file}}     
+
+  release:
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: ~/artifacts
+      - name: Publish Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: ~/artifacts/**/*.zip,~/artifacts/**/*.tar.gz
+          allowUpdates: true
+          generateReleaseNotes: true
+          replacesArtifacts: true
+          removeArtifacts: true
+          prerelease: false
+          draft: false
+          token: ${{ secrets.GITHUB_TOKEN }}
