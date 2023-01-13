@@ -5,15 +5,12 @@ name: Go
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    tags:
+      - 'v*'
+#     branches: [ "main" ]
+#   pull_request:
+#     branches: [ "main" ]
 
-# on:
-#   push:
-#     tags:
-#       - 'v*'
-      
 jobs:
 
   build:
@@ -77,21 +74,9 @@ jobs:
       id: build
       run: |
         go build -v ./...
-        echo "::set-output name=archive_name::${{matrix.artifact_name}}-${{matrix.system}}${{matrix.arch}}${{matrix.vendor}}${{matrix.abi}}"
-        echo "::set-output name=archive_file::${{matrix.artifact_name}}-${{matrix.system}}${{matrix.arch}}${{matrix.vendor}}${{matrix.abi}}${{matrix.archive_extension}}"
-        echo "::set-output name=archive_dir::."
-        
-    - name: Verify Artifact (windows)
-      if: ${{matrix.system == 'windows'}}
-      run: dir ${{steps.build.outputs.archive_dir}}
-      
-    - name: Verify Artifact (linux)
-      if: ${{matrix.system == 'linux'}}
-      run: ls -l ${{steps.build.outputs.archive_dir}}
-      
-    - name: Verify Artifact (macos)
-      if: ${{matrix.system == 'darwin'}}
-      run: ls -l ${{steps.build.outputs.archive_dir}}
+        echo "name=archive_name::${{matrix.artifact_name}}-${{matrix.system}}${{matrix.arch}}${{matrix.vendor}}${{matrix.abi}}" >> $GITHUB_OUTPUT
+        echo "name=archive_file::${{matrix.artifact_name}}-${{matrix.system}}${{matrix.arch}}${{matrix.vendor}}${{matrix.abi}}${{matrix.archive_extension}}" >> $GITHUB_OUTPUT
+        echo "name=archive_dir::." >> $GITHUB_OUTPUT
 
     - name: Test
       run: go test -v ./...
