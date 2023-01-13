@@ -26,24 +26,18 @@ jobs:
         include:
           - system: windows
             os: windows-latest
-            vendor: ""
-            abi: ""
             artifact_name: jwe-tool
-            artifact_extension: .exe
+            artifact_extension: ".exe"
             archive_type: zip
             archive_extension: .zip
           - system: darwin
             os: macos-latest
-            vendor: ""
-            abi: ""
             artifact_name: jwe-tool
             artifact_extension: ""
             archive_type: tar
             archive_extension: .tar.gz
           - system: linux
             os: ubuntu-latest
-            vendor: unknown
-            abi: ""
             artifact_name: jwe-tool
             artifact_extension: ""
             archive_type: tar
@@ -72,10 +66,7 @@ jobs:
 
     - name: Build
       id: build
-      run: |
-        go build -v ./...
-        echo "archive_name=${{matrix.artifact_name}}-${{matrix.system}}-${{matrix.arch}}${{matrix.vendor}}${{matrix.abi}}" >> $GITHUB_OUTPUT
-        echo "archive_file=${{matrix.artifact_name}}-${{matrix.system}}-${{matrix.arch}}${{matrix.vendor}}${{matrix.abi}}${{matrix.archive_extension}}" >> $GITHUB_OUTPUT
+      run: go build -v ./...
 
     - name: Test
       run: go test -v ./...
@@ -84,14 +75,14 @@ jobs:
       uses: thedoctor0/zip-release@master
       with:
         type: ${{matrix.archive_type}}
-        filename: ${{steps.build.outputs.archive_file}}
+        filename: ${{matrix.artifact_name}}${{matrix.archive_extension}}
         path: ${{matrix.artifact_name}}${{matrix.artifact_extension}}
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v3
       with:
-        name: ${{steps.build.outputs.archive_name}}
-        path: ${{steps.build.outputs.archive_file}}     
+        name: ${{matrix.artifact_name}}-${{matrix.system}}-${{matrix.arch}}
+        path: ${{matrix.artifact_name}}${{matrix.archive_extension}}
 
   release:
     needs:
