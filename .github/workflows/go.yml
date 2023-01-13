@@ -23,6 +23,7 @@ jobs:
           - linux
         arch:
          - amd64
+         - "386"
         include:
           - system: windows
             os: windows-latest
@@ -45,15 +46,13 @@ jobs:
         exclude:
           - system: darwin
             arch: "386"
-          - system: linux
-            arch: "386"
 
     runs-on: ${{ matrix.os }}
     
-#     env:
-#       CARGO_TERM_COLOR: always
-#       CARGO_BUILD_TARGET: ${{matrix.arch}}-${{matrix.vendor}}-${{matrix.system}}${{matrix.abi}}
-#       RUSTFLAGS: ${{matrix.rustflags}}
+    env:
+      GOARCH: always
+      CARGO_BUILD_TARGET: ${{matrix.arch}}-${{matrix.vendor}}-${{matrix.system}}${{matrix.abi}}
+      RUSTFLAGS: ${{matrix.rustflags}}
 
     steps:
 
