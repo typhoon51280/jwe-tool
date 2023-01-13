@@ -75,14 +75,14 @@ jobs:
       uses: thedoctor0/zip-release@master
       with:
         type: ${{matrix.archive_type}}
-        filename: ${{matrix.artifact_name}}${{matrix.archive_extension}}
+        filename: ${{matrix.artifact_name}}-${{matrix.system}}-${{matrix.arch}}${{matrix.archive_extension}}
         path: ${{matrix.artifact_name}}${{matrix.artifact_extension}}
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v3
       with:
         name: ${{matrix.artifact_name}}-${{matrix.system}}-${{matrix.arch}}
-        path: ${{matrix.artifact_name}}${{matrix.archive_extension}}
+        path: ${{matrix.artifact_name}}-${{matrix.system}}-${{matrix.arch}}${{matrix.archive_extension}}
 
   release:
     needs:
