@@ -88,6 +88,8 @@ jobs:
     needs:
       - build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v3
@@ -103,4 +105,3 @@ jobs:
           removeArtifacts: true
           prerelease: false
           draft: false
-          token: ${{ secrets.GITHUB_TOKEN }}
