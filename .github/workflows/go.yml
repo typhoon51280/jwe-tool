@@ -74,9 +74,8 @@ jobs:
       id: build
       run: |
         go build -v ./...
-        echo "archive_name=${{matrix.artifact_name}}-${{matrix.system}}${{matrix.arch}}${{matrix.vendor}}${{matrix.abi}}" >> $GITHUB_OUTPUT
-        echo "archive_file=${{matrix.artifact_name}}-${{matrix.system}}${{matrix.arch}}${{matrix.vendor}}${{matrix.abi}}${{matrix.archive_extension}}" >> $GITHUB_OUTPUT
-        echo "archive_dir=." >> $GITHUB_OUTPUT
+        echo "archive_name=${{matrix.artifact_name}}-${{matrix.system}}-${{matrix.arch}}${{matrix.vendor}}${{matrix.abi}}" >> $GITHUB_OUTPUT
+        echo "archive_file=${{matrix.artifact_name}}-${{matrix.system}}-${{matrix.arch}}${{matrix.vendor}}${{matrix.abi}}${{matrix.archive_extension}}" >> $GITHUB_OUTPUT
 
     - name: Test
       run: go test -v ./...
@@ -85,7 +84,6 @@ jobs:
       uses: thedoctor0/zip-release@master
       with:
         type: ${{matrix.archive_type}}
-        directory: ${{steps.build.outputs.archive_dir}}
         filename: ${{steps.build.outputs.archive_file}}
         path: ${{matrix.artifact_name}}${{matrix.artifact_extension}}
 
@@ -93,7 +91,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: ${{steps.build.outputs.archive_name}}
-        path: ${{steps.build.outputs.archive_dir}}/${{steps.build.outputs.archive_file}}     
+        path: ${{steps.build.outputs.archive_file}}     
 
   release:
     needs:
