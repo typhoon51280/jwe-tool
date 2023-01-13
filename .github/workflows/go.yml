@@ -50,9 +50,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     
     env:
-      GOARCH: always
-      CARGO_BUILD_TARGET: ${{matrix.arch}}-${{matrix.vendor}}-${{matrix.system}}${{matrix.abi}}
-      RUSTFLAGS: ${{matrix.rustflags}}
+      GOOS: ${{matrix.system}}
+      GOARCH: ${{matrix.arch}}
 
     steps:
 
