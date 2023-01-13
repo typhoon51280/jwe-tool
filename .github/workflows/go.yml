@@ -74,9 +74,9 @@ jobs:
       id: build
       run: |
         go build -v ./...
-        echo "name=archive_name::${{matrix.artifact_name}}-${{matrix.system}}${{matrix.arch}}${{matrix.vendor}}${{matrix.abi}}" >> $GITHUB_OUTPUT
-        echo "name=archive_file::${{matrix.artifact_name}}-${{matrix.system}}${{matrix.arch}}${{matrix.vendor}}${{matrix.abi}}${{matrix.archive_extension}}" >> $GITHUB_OUTPUT
-        echo "name=archive_dir::." >> $GITHUB_OUTPUT
+        echo "archive_name=${{matrix.artifact_name}}-${{matrix.system}}${{matrix.arch}}${{matrix.vendor}}${{matrix.abi}}" >> $GITHUB_OUTPUT
+        echo "archive_file=${{matrix.artifact_name}}-${{matrix.system}}${{matrix.arch}}${{matrix.vendor}}${{matrix.abi}}${{matrix.archive_extension}}" >> $GITHUB_OUTPUT
+        echo "archive_dir=." >> $GITHUB_OUTPUT
 
     - name: Test
       run: go test -v ./...
