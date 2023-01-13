@@ -25,7 +25,7 @@ jobs:
           - windows
           - linux
         arch:
-         - x86_64
+         - amd64
         include:
           - system: windows
             os: windows-latest
@@ -47,15 +47,15 @@ jobs:
             os: ubuntu-latest
             vendor: unknown
             abi: ""
-            artifact_name: scanner-cmd
+            artifact_name: jwe-tool
             artifact_extension: ""
             archive_type: tar
             archive_extension: .tar.gz
         exclude:
           - system: darwin
-            arch: i686
+            arch: "386"
           - system: linux
-            arch: i686
+            arch: "386"
 
     runs-on: ${{ matrix.os }}
     
@@ -76,8 +76,8 @@ jobs:
     - name: Build
       run: |
         go build -v ./...
-        echo "::set-output name=archive_name::${{artifact_name}}-${{matrix.system}}${{matrix.arch}}${{matrix.vendor}}${{matrix.abi}}"
-        echo "::set-output name=archive_file::${{artifact_name}}-${{matrix.system}}${{matrix.arch}}${{matrix.vendor}}${{matrix.abi}}${{matrix.archive_extension}}"
+        echo "::set-output name=archive_name::${{matrix.artifact_name}}-${{matrix.system}}${{matrix.arch}}${{matrix.vendor}}${{matrix.abi}}"
+        echo "::set-output name=archive_file::${{matrix.artifact_name}}-${{matrix.system}}${{matrix.arch}}${{matrix.vendor}}${{matrix.abi}}${{matrix.archive_extension}}"
         echo "::set-output name=archive_dir::./"
 
     - name: Test
