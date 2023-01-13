@@ -74,11 +74,12 @@ jobs:
         go-version: 1.19
 
     - name: Build
+      id: build
       run: |
         go build -v ./...
         echo "::set-output name=archive_name::${{matrix.artifact_name}}-${{matrix.system}}${{matrix.arch}}${{matrix.vendor}}${{matrix.abi}}"
         echo "::set-output name=archive_file::${{matrix.artifact_name}}-${{matrix.system}}${{matrix.arch}}${{matrix.vendor}}${{matrix.abi}}${{matrix.archive_extension}}"
-        echo "::set-output name=archive_dir::./"
+        echo "::set-output name=archive_dir::."
         
     - name: Verify Artifact (windows)
       if: ${{matrix.system == 'windows'}}
