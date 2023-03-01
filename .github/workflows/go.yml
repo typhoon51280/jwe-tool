@@ -64,10 +64,10 @@ jobs:
 
     - name: Build
       id: build
-      run: go build -v ./...
+      run: go build -v .
 
     - name: Test
-      run: go test -v ./...
+      run: go test -v .
       
     - name: Compress Artifact
       uses: thedoctor0/zip-release@master
