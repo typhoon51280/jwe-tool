@@ -164,8 +164,6 @@ func verify() {
 	fmt.Printf("tokenSigned: %v\n", tokenSigned.FullSerialize())
 
 	verified, err := tokenSigned.Verify(publicKey)
-
-	jwt.Parse()
 	if err != nil {
 		log.Fatalf("Error verifying jws: %v", err)
 	}
