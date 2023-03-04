@@ -15,7 +15,7 @@ type EncodeOptions struct {
 
 func Encode(payload string, encodeOptions EncodeOptions, signOptions SignOptions) string {
 
-	log.Debug().Msgf("Encode with options: %v", encodeOptions)
+	log.Debug().Msgf("Encode with options: %+v", encodeOptions)
 
 	if encodeOptions.Sign {
 		payload = Sign(payload, signOptions)
@@ -33,13 +33,13 @@ func Encode(payload string, encodeOptions EncodeOptions, signOptions SignOptions
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to instantiate encrypter")
 	}
-	log.Trace().Msgf("Encrypter created: %v", crypter)
+	log.Trace().Msgf("Encrypter created: %+v", crypter)
 
 	obj, err := crypter.Encrypt([]byte(payload))
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to encrypt")
 	}
-	log.Trace().Msgf("Encrypting completed: %v", obj)
+	log.Trace().Msgf("Encrypting completed: %+v", obj.FullSerialize())
 
 	var encoded string
 	if encodeOptions.Full {
@@ -52,7 +52,7 @@ func Encode(payload string, encodeOptions EncodeOptions, signOptions SignOptions
 			log.Fatal().Err(err).Msg("unable to serialize message")
 		}
 	}
-	log.Debug().Msg("JWT encoded with success !!!")
+	log.Info().Msg("JWT encoded with success !!!")
 	return encoded
 }
 
@@ -61,10 +61,10 @@ func Decode(payload string, encodeOptions EncodeOptions, signOptions SignOptions
 	log.Debug().Msgf("Decode with options: %v", encodeOptions)
 
 	encryptedData, err1 := jose.ParseEncrypted(payload)
-	log.Trace().Msgf("encryptedData: %v", encryptedData)
 	if err1 != nil {
 		log.Fatal().Err(err1).Msg("Unable to parse payload")
 	}
+	log.Debug().Msg("Parsed encrypted data")
 
 	data, err2 := encryptedData.Decrypt(encodeOptions.Key)
 	if err2 != nil {
@@ -74,10 +74,10 @@ func Decode(payload string, encodeOptions EncodeOptions, signOptions SignOptions
 	log.Trace().Msgf("plaintext: %v", plaintext)
 
 	if encodeOptions.Sign {
-		return Sign(plaintext, signOptions)
+		Verify(plaintext, signOptions)
 	}
 
-	log.Debug().Msg("JWT decoded with success !!!")
+	log.Info().Msg("JWT decrypted OK")
 
 	return plaintext
 }

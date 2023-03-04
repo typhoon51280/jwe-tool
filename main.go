@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"strings"
 
+	"github.com/fatih/color"
 	"github.com/rs/zerolog/log"
 	"github.com/typhoon51280/jwe-tool/crypto"
 	"github.com/typhoon51280/jwe-tool/ioutil"
@@ -13,25 +15,30 @@ import (
 
 var flgOp = flag.String("command", "decrypt", "encrypt|decrypt|verify|sign")
 var token = flag.String("token", "", "token")
-var encKeyPath = flag.String("encKey", "", "encrypt key path")
-
-// var publicKeyPath = flag.String("encPub", "", "public enc key path")
-var sigKeyPath = flag.String("sigKey", "", "sign key path")
-
-// var signPublicKeyPath = flag.String("sigPub", "", "public sign key path")
-var jwksPath = flag.String("jwks", "", "JWKS file path")
+var encKeyPath = flag.String("enc", "", "encrypt key path")
+var sigKeyPath = flag.String("sig", "", "sign key path")
 var kid = flag.String("kid", "PROSPECT", "Key ID")
 var inFile = flag.String("in", "", "output file path")
 var outFile = flag.String("out", "", "output file path")
-var encryptFullFlag = flag.Bool("encFull", false, "encrypt full flag")
-var encryptAlgFlag = flag.String("algEnc", "RSA-OAEP", "encrypt algorithm")
-var encryptEncFlag = flag.String("enc", "A128GCM", "encrypt encoding")
-var signAlgFlag = flag.String("algSig", "RS256", "encrypt algorithm")
-var signFullFlag = flag.Bool("signFull", false, "sign full flag")
+var serializationMode = flag.String("mode", "compact", "serialization mode: compact|full")
+var encryptCypher = flag.String("cypher", "A128GCM", "encrypt cypher")
+var encryptAlgorithm = flag.String("alg-encode", "RSA-OAEP", "encrypt algorithm")
+var signAlgorithm = flag.String("alg-sign", "RS256", "encrypt algorithm")
+
+// Logging
+var logLevel = flag.String("log", "info", "log level: panic|fatal|error|warn|info|debug|trace\\all")
+var logFilePath = flag.String("logfile", "", "log file path")
 
 func main() {
-	ioutil.InitLogger(ioutil.LogParameters{})
 	flag.Parse()
+	logFile := ioutil.CreateLogFile(*logFilePath)
+	if logFile != nil {
+		defer logFile.Close()
+	}
+	ioutil.InitLogger(ioutil.LogParameters{
+		File:  logFile,
+		Level: *logLevel,
+	})
 	switch *flgOp {
 	case "encrypt":
 		encrypt()
@@ -44,6 +51,26 @@ func main() {
 	default:
 		fmt.Println("pass either encrypt|decrypt|verify|sign")
 	}
+}
+
+func createEncOptions(key interface{}) crypto.EncodeOptions {
+	encOptions := crypto.EncodeOptions{
+		Algorithm: *encryptAlgorithm,
+		Encoding:  *encryptCypher,
+		Key:       key,
+		Full:      (strings.ToLower(*serializationMode) == "full"),
+		Sign:      len(*sigKeyPath) > 0,
+	}
+	return encOptions
+}
+
+func createSignOptions(key interface{}) crypto.SignOptions {
+	signOptions := crypto.SignOptions{
+		Algorithm: *signAlgorithm,
+		Full:      (strings.ToLower(*serializationMode) == "full"),
+		Key:       key,
+	}
+	return signOptions
 }
 
 func decrypt() {
@@ -62,30 +89,30 @@ func decrypt() {
 		input = ioutil.LoadInputStr(*inFile)
 	}
 
-	encKey, err := key.LoadPrivateKey(*encKeyPath)
+	encPrivateKeyBytes := ioutil.LoadInput(*encKeyPath)
+	encPrivateKey, err := key.LoadPrivateKey(encPrivateKeyBytes, true)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("Error loading encrypt private key %v", *encKeyPath)
 	}
 	log.Debug().Msgf("Decrypt Private Key Loaded")
 
-	encOptions := crypto.EncodeOptions{
-		Algorithm: *encryptAlgFlag,
-		Encoding:  *encryptEncFlag,
-		Key:       encKey,
-		Full:      *encryptFullFlag,
-		Sign:      len(*sigKeyPath) > 0,
-	}
-	signOptions := crypto.SignOptions{
-		Algorithm: *signAlgFlag,
-		Full:      *signFullFlag,
+	encOptions := createEncOptions(encPrivateKey)
+	signOptions := crypto.SignOptions{}
+	if encOptions.Sign {
+		sigPublicKeyBytes := ioutil.LoadInput(*sigKeyPath)
+		if sigPublicKey, err := key.LoadPublicKey(sigPublicKeyBytes, *kid, true); err != nil {
+			log.Fatal().Err(err).Msgf("Error loading sign public key %v", *sigKeyPath)
+		} else {
+			signOptions = createSignOptions(sigPublicKey)
+		}
 	}
 
 	plaintext := crypto.Decode(input, encOptions, signOptions)
 
-	ioutil.PrintText(plaintext)
-	ioutil.PrintJWT(plaintext)
+	ioutil.PrintText(plaintext, "Plaintext:", color.BgCyan, color.FgWhite, color.Bold)
+	ioutil.PrintJWT(plaintext, signOptions.Key)
 
-	log.Info().Msg("DONE :)")
+	log.Info().Msg("DONE 😀")
 }
 
 func encrypt() {
@@ -101,35 +128,40 @@ func encrypt() {
 
 	input := ioutil.LoadInputStr(*inFile)
 
-	encKey, err := key.LoadPublicKey(*encKeyPath, *kid)
+	encPublicKeyBytes := ioutil.LoadInput(*encKeyPath)
+	encPublicKey, err := key.LoadPublicKey(encPublicKeyBytes, *kid, true)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("Error loading encrypt public key %v %v", *encKeyPath, kid)
 	}
 	log.Debug().Msgf("Encrypt Public Key Loaded")
 
-	encOptions := crypto.EncodeOptions{
-		Algorithm: *encryptAlgFlag,
-		Encoding:  *encryptEncFlag,
-		Key:       encKey,
-		Full:      *encryptFullFlag,
-		Sign:      len(*sigKeyPath) > 0,
-	}
-	signOptions := crypto.SignOptions{
-		Algorithm: *signAlgFlag,
-		Full:      *signFullFlag,
-	}
+	encOptions := createEncOptions(encPublicKey)
+	signOptions := crypto.SignOptions{}
 	if encOptions.Sign {
-		sigKey, err1 := key.LoadPrivateKey(*sigKeyPath)
-		if err1 != nil {
-			log.Fatal().Err(err1).Msgf("Error loading sign private key %v", *sigKeyPath)
+		sigPrivateKeyBytes := ioutil.LoadInput(*sigKeyPath)
+		if sigPrivateKey, err := key.LoadPrivateKey(sigPrivateKeyBytes, true); err != nil {
+			log.Fatal().Err(err).Msgf("Error loading sign private key %v", *sigKeyPath)
+		} else {
+			signOptions = createSignOptions(sigPrivateKey)
 		}
-		signOptions.Key = sigKey
 	}
 
 	output := crypto.Encode(input, encOptions, signOptions)
-	ioutil.WriteOutput(*outFile, output)
+	if *serializationMode == "full" {
+		var fullJSON interface{}
+		if err := json.Unmarshal([]byte(output), &fullJSON); err != nil {
+			log.Fatal().Err(err).Msg("Failed unmarshalling JSON payload")
+		} else {
+			output = ioutil.PrettyJSON(fullJSON)
+		}
+	}
+	if len(*outFile) > 0 {
+		ioutil.WriteOutput(*outFile, output)
+	} else {
+		ioutil.PrintText(output, "Encrypted Data:", color.BgRed, color.FgWhite, color.Bold)
+	}
 
-	log.Info().Msg("DONE :)")
+	log.Info().Msg("DONE 😀")
 
 }
 
@@ -146,22 +178,25 @@ func sign() {
 
 	input := ioutil.LoadInputStr(*inFile)
 
-	sigKey, err := key.LoadPrivateKey(*sigKeyPath)
+	sigPrivateKeyBytes := ioutil.LoadInput(*sigKeyPath)
+	sigPrivateKey, err := key.LoadPrivateKey(sigPrivateKeyBytes, true)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("Error loading sign private key %v", *sigKeyPath)
+		log.Fatal().Err(err).Msgf("Error loading sign private key %s", *sigKeyPath)
 	}
-	log.Debug().Msg("Sign Private Key Loaded")
+	log.Info().Msg("Sign Private Key Loaded")
 
 	signOptions := crypto.SignOptions{
-		Algorithm: *signAlgFlag,
-		Key:       sigKey,
-		Full:      *signFullFlag,
+		Algorithm: *signAlgorithm,
+		Key:       sigPrivateKey,
+		Full:      (strings.ToLower(*serializationMode) == "full"),
 	}
 
 	serialized := crypto.Sign(input, signOptions)
+	log.Info().Msg("Signed payload")
+
 	ioutil.WriteOutput(*outFile, serialized)
 
-	log.Info().Msg("DONE :)")
+	log.Info().Msg("DONE 😀")
 
 }
 
@@ -178,23 +213,25 @@ func verify() {
 
 	input := ioutil.LoadInputStr(*inFile)
 
-	sigKey, err := key.LoadPublicKey(*sigKeyPath, *kid)
+	sigPublicKeyBytes := ioutil.LoadInput(*sigKeyPath)
+	sigPublicKey, err := key.LoadPublicKey(sigPublicKeyBytes, *kid, true)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("Error loading sign public key %v %v", *sigKeyPath, *kid)
 	}
-	log.Debug().Msg("Sign Public Key Loaded")
+	log.Info().Msg("Sign Public Key Loaded")
 
 	signOptions := crypto.SignOptions{
-		Algorithm: *signAlgFlag,
-		Key:       sigKey,
-		Full:      *signFullFlag,
+		Algorithm: *signAlgorithm,
+		Key:       sigPublicKey,
+		Full:      (strings.ToLower(*serializationMode) == "full"),
 	}
 
 	plaintext := crypto.Verify(input, signOptions)
+	log.Info().Msg("Veryfied payload")
 	var jwt interface{}
 	json.Unmarshal([]byte(plaintext), &jwt)
 	ioutil.PrintBody(jwt)
 
-	log.Info().Msg("DONE :)")
+	log.Info().Msg("DONE 😀")
 
 }

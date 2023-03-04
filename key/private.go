@@ -8,7 +8,7 @@ import (
 	"syscall"
 
 	"github.com/rs/zerolog/log"
-	"github.com/typhoon51280/jwe-tool/ioutil"
+	"go.step.sm/crypto/keyutil"
 
 	"golang.org/x/term"
 )
@@ -22,46 +22,60 @@ func ReadPassword() []byte {
 	return bytepw
 }
 
-func LoadPrivateKey(filename string) (interface{}, error) {
-
+func ReadKey(payload []byte, checkForPassword bool) []byte {
 	var err error
-	var privateKey interface{}
-
-	data := ioutil.LoadInput(filename)
-	input := []byte(data)
-	block, _ := pem.Decode(input)
+	block, _ := pem.Decode(payload)
 	if block != nil {
-		input = block.Bytes
-	}
-
-	if x509.IsEncryptedPEMBlock(block) {
-		log.Debug().Msg("Found Password Protected Block")
-		password := ReadPassword()
-		if input, err = x509.DecryptPEMBlock(block, password); err != nil {
-			log.Fatal().Err(err).Msg("Decrypt failed")
+		log.Trace().Msgf("Found PEM Block %s: %+v", block.Type, block.Headers)
+		payload = block.Bytes
+		if checkForPassword && x509.IsEncryptedPEMBlock(block) {
+			log.Trace().Msg("Found Password Protected Block")
+			password := ReadPassword()
+			if payload, err = x509.DecryptPEMBlock(block, password); err != nil {
+				log.Fatal().Err(err).Msg("Decrypt failed")
+			}
+			log.Debug().Msg("Decrypted PEM Key with success.")
 		}
+		log.Debug().Msg("Decoded PEM Block with success.")
 	}
+	return payload
+}
 
-	if privateKey, err = x509.ParsePKCS1PrivateKey(input); err == nil {
-		log.Debug().Msg("Found PKCS1PrivateKey !!!")
-		return privateKey, nil
+func LoadKeyPair(data []byte, checkForPassword bool) (interface{}, interface{}, error) {
+
+	input := ReadKey(data, checkForPassword)
+
+	log.Debug().Msg("Testing for PKCS1PrivateKey ...")
+	if privateKey, err := x509.ParsePKCS1PrivateKey(input); err == nil {
+		log.Debug().Msg("Found PKCS1PrivateKey")
+		return privateKey, privateKey.Public(), nil
 	} else {
 		log.Trace().Err(err).Send()
 	}
 
-	if privateKey, err = x509.ParsePKCS8PrivateKey(input); err == nil {
-		log.Debug().Msg("Found PKCS8PrivateKey !!!")
-		return privateKey, nil
+	log.Debug().Msg("Testing for PKCS8PrivateKey ...")
+	if privateKey, err := x509.ParsePKCS8PrivateKey(input); err == nil {
+		log.Debug().Msg("Found PKCS8PrivateKey")
+		if publicKey, err2 := keyutil.PublicKey(privateKey); err2 == nil {
+			log.Debug().Msg("Extracted PublicKey from PKCS8PrivateKey")
+			return privateKey, publicKey, nil
+		}
 	} else {
 		log.Trace().Err(err).Send()
 	}
 
-	if privateKey, err = x509.ParseECPrivateKey(input); err == nil {
-		log.Debug().Msg("Found ECPrivateKey !!!")
-		return privateKey, nil
+	log.Debug().Msg("Testing for ECPrivateKey ...")
+	if privateKey, err := x509.ParseECPrivateKey(input); err == nil {
+		log.Debug().Msg("Found ECPrivateKey")
+		return privateKey, privateKey.PublicKey, nil
 	} else {
 		log.Trace().Err(err).Send()
 	}
 
-	return nil, errors.New("parse error, invalid private key")
+	return nil, nil, errors.New("parse error, invalid private key")
+}
+
+func LoadPrivateKey(data []byte, checkForPassword bool) (interface{}, error) {
+	privateKey, _, err := LoadKeyPair(data, checkForPassword)
+	return privateKey, err
 }

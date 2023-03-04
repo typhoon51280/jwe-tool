@@ -11,6 +11,8 @@ import (
 func LoadJSONWebKey(json []byte, pub bool, kid string) (*jose.JSONWebKey, error) {
 	var key jose.JSONWebKey
 	var jwk *jose.JSONWebKey
+
+	log.Debug().Msg("Testing for Single JsonWebKey ...")
 	err := key.UnmarshalJSON(json)
 	if err != nil {
 		log.Trace().Err(err).Send()
@@ -19,6 +21,7 @@ func LoadJSONWebKey(json []byte, pub bool, kid string) (*jose.JSONWebKey, error)
 			log.Trace().Err(err).Send()
 		}
 	} else {
+		log.Debug().Msg("Found JsonWebKey")
 		jwk = &key
 	}
 	if jwk == nil {
@@ -35,16 +38,20 @@ func LoadJSONWebKey(json []byte, pub bool, kid string) (*jose.JSONWebKey, error)
 
 func LoadJSONWebKeySet(jwkBytes []byte, kid string) (*jose.JSONWebKey, error) {
 	var jwkSet jose.JSONWebKeySet
+
+	log.Debug().Msg("Testing for JsonWebKeySet ...")
 	err := json.Unmarshal(jwkBytes, &jwkSet)
 	if err != nil {
 		log.Trace().Err(err).Send()
 		return nil, errors.New("error parsing jwk key set")
 	}
+	log.Debug().Msg("Found JsonWebKeySet")
 	keys := jwkSet.Keys
 	if len(kid) > 0 {
 		keys = jwkSet.Key(kid)
 	}
 	if len(keys) > 0 {
+		log.Debug().Msgf("Found JsonWebKey for %s", kid)
 		return &keys[0], nil
 	} else {
 		return nil, errors.New("no keys found in jwk")

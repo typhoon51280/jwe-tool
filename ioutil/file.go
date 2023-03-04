@@ -11,24 +11,19 @@ func LoadInputStr(filename string) string {
 }
 
 func LoadInput(filename string) []byte {
+	log.Trace().Msgf("Reading file [%s] ...", filename)
 	inBytes, err := os.ReadFile(filename)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("unable to read file %v", filename)
+		log.Fatal().Err(err).Msgf("Unable to read file %v", filename)
 	}
+	log.Info().Msgf("Reading from file [%s] completed with success.", filename)
 	return inBytes
 }
 
-func WriteOutput(path string, text string) {
-	var err error
-
-	if path != "" {
-		err = os.WriteFile(path, []byte(text), 0666)
-	} else {
-		PrintText(text)
+func WriteOutput(filename string, text string) {
+	log.Trace().Msgf("Writing file [%s] ...", filename)
+	if err := os.WriteFile(filename, []byte(text), 0666); err != nil {
+		log.Fatal().Err(err).Msgf("Unable to write file %v", filename)
 	}
-
-	if err != nil {
-		log.Fatal().Err(err).Msgf("unable to write file %v", path)
-	}
-
+	log.Info().Msgf("Writing to file [%s] completed with success.", filename)
 }

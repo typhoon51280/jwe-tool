@@ -15,26 +15,25 @@ type SignOptions struct {
 
 func Sign(payload string, signOptions SignOptions) string {
 
-	log.Debug().Msgf("Sign with options: %v", signOptions)
+	log.Debug().Msgf("Sign with options: %+v", signOptions)
 
 	signKey := jose.SigningKey{
 		Algorithm: jose.SignatureAlgorithm(signOptions.Algorithm),
 		Key:       signOptions.Key,
 	}
 	signerOptions := jose.SignerOptions{
-		EmbedJWK: true,
+		EmbedJWK: false,
 	}
 	signer, err := jose.NewSigner(signKey, &signerOptions)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to instantiate signer")
 	}
-	log.Trace().Msgf("JWT Signer: %v", signer)
+	log.Trace().Msgf("JWT Signer: %+v", signer)
 
 	signedPayload, err := signer.Sign([]byte(payload))
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to sign")
 	}
-	log.Trace().Msgf("JWT Signed: %v", signedPayload)
 
 	var serialized string
 	if signOptions.Full {
@@ -46,14 +45,14 @@ func Sign(payload string, signOptions SignOptions) string {
 			log.Fatal().Err(err).Msg("unable to serialize message")
 		}
 	}
-	log.Debug().Msg("JWT signed with success !!!")
+	log.Debug().Msg("JWT signature verified OK")
 	return serialized
 
 }
 
 func Verify(payload string, signOptions SignOptions) string {
 
-	log.Debug().Msgf("Verify with options: %v", signOptions)
+	log.Debug().Msgf("Verify with options: %#v", signOptions)
 
 	jwtSigned, err := jose.ParseSigned(payload)
 	if err != nil {
@@ -69,7 +68,7 @@ func Verify(payload string, signOptions SignOptions) string {
 	plaintext = strings.Replace(plaintext, "\r", "", -1)
 	plaintext = strings.Replace(plaintext, "\n", "", -1)
 	log.Trace().Msgf("JWT Verified: %s", plaintext)
-	log.Debug().Msg("JWT verified with success !!!")
+	log.Info().Msg("JWT verified with success !!!")
 
 	return plaintext
 }

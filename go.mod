@@ -7,10 +7,12 @@ require (
 	github.com/go-jose/go-jose/v3 v3.0.0
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/rs/zerolog v1.29.0
+	go.step.sm/crypto v0.25.2
 	golang.org/x/term v0.5.0
 )
 
 require (
+	filippo.io/edwards25519 v1.0.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/pkg/errors v0.9.1 // indirect

@@ -9,25 +9,24 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func PrintJSON(j interface{}) error {
-	var out []byte
-	var err error
-	out, err = json.MarshalIndent(j, "", "    ")
-	if err == nil {
-		color.Set(color.BgRed, color.FgWhite, color.Bold)
-		fmt.Print(string(out))
-		color.Unset()
+func PrettyJSON(j interface{}) string {
+	if out, err := json.MarshalIndent(j, "", "    "); err != nil {
+		log.Error().Err(err).Msg("Failed JSON pretty output")
+		return ""
+	} else {
+		return string(out)
 	}
-	return err
+
 }
 
-func PrintText(plaintext string) {
+func PrintText(plaintext string, header string, colors ...color.Attribute) {
 	color.Set(color.FgHiYellow, color.Bold)
-	fmt.Println("\nPlaintext:")
-	fmt.Println("-------------")
+	fmt.Printf("\n%s", header)
+	fmt.Println("\n-------------")
 	color.Unset()
-	color.Set(color.BgCyan, color.FgWhite, color.Bold)
-	fmt.Print(string(plaintext))
+	// color.Set(color.BgCyan, color.FgWhite, color.Bold)
+	color.Set(colors...)
+	fmt.Print(plaintext)
 	color.Unset()
 	color.Set(color.FgHiYellow, color.Bold)
 	fmt.Print("\n-------------\n\n")
@@ -35,33 +34,17 @@ func PrintText(plaintext string) {
 }
 
 func PrintHeader(header interface{}) {
-	color.Set(color.FgHiYellow, color.Bold)
-	fmt.Println("\nToken Header:")
-	fmt.Println("-------------")
-	color.Unset()
-	if err := PrintJSON(header); err != nil {
-		log.Fatal().Err(err).Msg("failed to output header")
-	}
-	color.Unset()
-	color.Set(color.FgHiYellow, color.Bold)
-	fmt.Print("\n-------------\n\n")
+	PrintText(PrettyJSON(header), "Token Header:", color.BgRed, color.FgWhite, color.Bold)
 }
 
 func PrintBody(body interface{}) {
-	color.Set(color.FgHiYellow, color.Bold)
-	fmt.Println("\nToken Body:")
-	fmt.Println("-------------")
-	color.Unset()
-	if err := PrintJSON(body); err != nil {
-		log.Fatal().Err(err).Msg("failed to output body")
-	}
-	color.Unset()
-	color.Set(color.FgHiYellow, color.Bold)
-	fmt.Print("\n-------------\n\n")
+	PrintText(PrettyJSON(body), "Token Body:", color.BgRed, color.FgWhite, color.Bold)
 }
 
-func PrintJWT(plaintext string) {
-	jwtToken, err := jwt.Parse(plaintext, nil)
+func PrintJWT(plaintext string, key interface{}) {
+	jwtToken, err := jwt.Parse(plaintext, func(t *jwt.Token) (interface{}, error) {
+		return key, nil
+	})
 	if err != nil {
 		log.Fatal().Err(err).Msg("Error Parsing JWT")
 	}
