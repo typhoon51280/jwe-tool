@@ -5,9 +5,10 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"log"
-	"os"
 	"syscall"
+
+	"github.com/rs/zerolog/log"
+	"github.com/typhoon51280/jwe-tool/ioutil"
 
 	"golang.org/x/term"
 )
@@ -16,81 +17,51 @@ func ReadPassword() []byte {
 	fmt.Print("Password: ")
 	bytepw, err := term.ReadPassword(int(syscall.Stdin))
 	if err != nil {
-		os.Exit(1)
+		log.Panic().Err(err).Send()
 	}
-	// pass := string(bytepw)
-	fmt.Printf("\nYou've entered: %q\n", bytepw)
 	return bytepw
 }
 
 func LoadPrivateKey(filename string) (interface{}, error) {
 
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		log.Fatalf("unable to read private key file: %v", err)
-	}
+	var err error
+	var privateKey interface{}
 
-	input := data
-
-	block, _ := pem.Decode(data)
+	data := ioutil.LoadInput(filename)
+	input := []byte(data)
+	block, _ := pem.Decode(input)
 	if block != nil {
 		input = block.Bytes
 	}
 
 	if x509.IsEncryptedPEMBlock(block) {
+		log.Debug().Msg("Found Password Protected Block")
 		password := ReadPassword()
-		der, err := x509.DecryptPEMBlock(block, password)
-		if err != nil {
-			log.Fatalf("Decrypt failed: %v", err)
+		if input, err = x509.DecryptPEMBlock(block, password); err != nil {
+			log.Fatal().Err(err).Msg("Decrypt failed")
 		}
-		input = pem.EncodeToMemory(&pem.Block{Type: block.Type, Bytes: der})
 	}
 
-	var priv interface{}
-	priv, err0 := x509.ParsePKCS1PrivateKey(input)
-	if err0 == nil {
-		return priv, nil
+	if privateKey, err = x509.ParsePKCS1PrivateKey(input); err == nil {
+		log.Debug().Msg("Found PKCS1PrivateKey !!!")
+		return privateKey, nil
+	} else {
+		log.Trace().Err(err).Send()
 	}
 
-	priv, err1 := x509.ParsePKCS8PrivateKey(input)
-	if err1 == nil {
-		return priv, nil
+	if privateKey, err = x509.ParsePKCS8PrivateKey(input); err == nil {
+		log.Debug().Msg("Found PKCS8PrivateKey !!!")
+		return privateKey, nil
+	} else {
+		log.Trace().Err(err).Send()
 	}
 
-	priv, err2 := x509.ParseECPrivateKey(input)
-	if err2 == nil {
-		return priv, nil
+	if privateKey, err = x509.ParseECPrivateKey(input); err == nil {
+		log.Debug().Msg("Found ECPrivateKey !!!")
+		return privateKey, nil
+	} else {
+		log.Trace().Err(err).Send()
 	}
 
 	return nil, errors.New("parse error, invalid private key")
-}
-
-func ReadPublicKey(filename string) (interface{}, error) {
-
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		log.Fatalf("unable to read private key file: %v", err)
-	}
-
-	block, _ := pem.Decode(data)
-	if block != nil {
-		data = block.Bytes
-	}
-
-	priv1, err1 := x509.ParsePKCS1PrivateKey(data)
-	if err1 == nil {
-		return priv1.Public(), nil
-	}
-
-	priv2, err2 := x509.ParseECPrivateKey(data)
-	if err2 == nil {
-		return priv2.Public(), nil
-	}
-
-	priv3, err3 := x509.ParsePKCS8PrivateKey(data)
-	if err3 == nil {
-		return priv3, nil
-	}
-
-	return nil, fmt.Errorf("%w\n%w\n%w", err1, err2, err3)
 }

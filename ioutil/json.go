@@ -3,9 +3,10 @@ package ioutil
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"github.com/fatih/color"
+	"github.com/golang-jwt/jwt/v4"
+	"github.com/rs/zerolog/log"
 )
 
 func PrintJSON(j interface{}) error {
@@ -20,7 +21,7 @@ func PrintJSON(j interface{}) error {
 	return err
 }
 
-func PrintText(plaintext []byte) {
+func PrintText(plaintext string) {
 	color.Set(color.FgHiYellow, color.Bold)
 	fmt.Println("\nPlaintext:")
 	fmt.Println("-------------")
@@ -28,24 +29,42 @@ func PrintText(plaintext []byte) {
 	color.Set(color.BgCyan, color.FgWhite, color.Bold)
 	fmt.Print(string(plaintext))
 	color.Unset()
+	color.Set(color.FgHiYellow, color.Bold)
+	fmt.Print("\n-------------\n\n")
+	color.Unset()
 }
 
 func PrintHeader(header interface{}) {
 	color.Set(color.FgHiYellow, color.Bold)
-	fmt.Println("\n\nToken Header:")
+	fmt.Println("\nToken Header:")
 	fmt.Println("-------------")
 	color.Unset()
 	if err := PrintJSON(header); err != nil {
-		log.Fatalf("failed to output header: %v", err)
+		log.Fatal().Err(err).Msg("failed to output header")
 	}
+	color.Unset()
+	color.Set(color.FgHiYellow, color.Bold)
+	fmt.Print("\n-------------\n\n")
 }
 
-func PrintClaims(claims interface{}) {
+func PrintBody(body interface{}) {
 	color.Set(color.FgHiYellow, color.Bold)
-	fmt.Println("\n\nToken Claims:")
+	fmt.Println("\nToken Body:")
 	fmt.Println("-------------")
 	color.Unset()
-	if err := PrintJSON(claims); err != nil {
-		log.Fatalf("failed to output claims: %v", err)
+	if err := PrintJSON(body); err != nil {
+		log.Fatal().Err(err).Msg("failed to output body")
 	}
+	color.Unset()
+	color.Set(color.FgHiYellow, color.Bold)
+	fmt.Print("\n-------------\n\n")
+}
+
+func PrintJWT(plaintext string) {
+	jwtToken, err := jwt.Parse(plaintext, nil)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Error Parsing JWT")
+	}
+	PrintHeader(jwtToken.Header)
+	PrintBody(jwtToken.Claims)
 }

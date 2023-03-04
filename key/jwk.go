@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	jose "github.com/go-jose/go-jose/v3"
+	"github.com/rs/zerolog/log"
 )
 
 func LoadJSONWebKey(json []byte, pub bool, kid string) (*jose.JSONWebKey, error) {
@@ -12,7 +13,11 @@ func LoadJSONWebKey(json []byte, pub bool, kid string) (*jose.JSONWebKey, error)
 	var jwk *jose.JSONWebKey
 	err := key.UnmarshalJSON(json)
 	if err != nil {
-		jwk, _ = LoadJSONWebKeySet(json, kid)
+		log.Trace().Err(err).Send()
+		jwk, err = LoadJSONWebKeySet(json, kid)
+		if err != nil {
+			log.Trace().Err(err).Send()
+		}
 	} else {
 		jwk = &key
 	}
@@ -32,7 +37,8 @@ func LoadJSONWebKeySet(jwkBytes []byte, kid string) (*jose.JSONWebKey, error) {
 	var jwkSet jose.JSONWebKeySet
 	err := json.Unmarshal(jwkBytes, &jwkSet)
 	if err != nil {
-		return nil, err
+		log.Trace().Err(err).Send()
+		return nil, errors.New("error parsing jwk key set")
 	}
 	keys := jwkSet.Keys
 	if len(kid) > 0 {

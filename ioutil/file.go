@@ -1,29 +1,34 @@
 package ioutil
 
 import (
-	"log"
 	"os"
+
+	"github.com/rs/zerolog/log"
 )
 
-func LoadInput(filename string) string {
-	inBytes, err := os.ReadFile(filename)
-	if err != nil {
-		log.Fatalf("unable to read file: %v", err)
-	}
-	return string(inBytes)
+func LoadInputStr(filename string) string {
+	return string(LoadInput(filename))
 }
 
-func WriteOutput(path string, data []byte) {
+func LoadInput(filename string) []byte {
+	inBytes, err := os.ReadFile(filename)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("unable to read file %v", filename)
+	}
+	return inBytes
+}
+
+func WriteOutput(path string, text string) {
 	var err error
 
 	if path != "" {
-		err = os.WriteFile(path, data, 0666)
+		err = os.WriteFile(path, []byte(text), 0666)
 	} else {
-		_, err = os.Stdout.Write(data)
+		PrintText(text)
 	}
 
 	if err != nil {
-		log.Fatalf("unable to write output: %v", err)
+		log.Fatal().Err(err).Msgf("unable to write file %v", path)
 	}
 
 }

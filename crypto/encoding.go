@@ -1,33 +1,83 @@
 package crypto
 
 import (
-	"log"
-
 	"github.com/go-jose/go-jose/v3"
+	"github.com/rs/zerolog/log"
 )
 
-func Encode(payload []byte, publicKey interface{}, algorithm string, encoding string, full bool) string {
-	alg := jose.KeyAlgorithm(algorithm)
-	enc := jose.ContentEncryption(encoding)
-	recpt := jose.Recipient{Algorithm: alg, Key: publicKey}
-	opts := jose.EncrypterOptions{}
-	crypter, err := jose.NewEncrypter(enc, recpt, &opts)
-	if err != nil {
-		log.Fatalf("unable to instantiate encrypter: %v\n", err)
+type EncodeOptions struct {
+	Algorithm string
+	Encoding  string
+	Full      bool
+	Sign      bool
+	Key       interface{}
+}
+
+func Encode(payload string, encodeOptions EncodeOptions, signOptions SignOptions) string {
+
+	log.Debug().Msgf("Encode with options: %v", encodeOptions)
+
+	if encodeOptions.Sign {
+		payload = Sign(payload, signOptions)
 	}
 
-	obj, err := crypter.Encrypt(payload)
-	if err != nil {
-		log.Fatalf("unable to encrypt: %v", err)
+	alg := jose.KeyAlgorithm(encodeOptions.Algorithm)
+	enc := jose.ContentEncryption(encodeOptions.Encoding)
+	recpt := jose.Recipient{
+		Algorithm: alg,
+		Key:       encodeOptions.Key,
 	}
+	encrypterOptions := jose.EncrypterOptions{}
 
-	if full {
-		return obj.FullSerialize()
+	crypter, err := jose.NewEncrypter(enc, recpt, &encrypterOptions)
+	if err != nil {
+		log.Fatal().Err(err).Msg("unable to instantiate encrypter")
+	}
+	log.Trace().Msgf("Encrypter created: %v", crypter)
+
+	obj, err := crypter.Encrypt([]byte(payload))
+	if err != nil {
+		log.Fatal().Err(err).Msg("unable to encrypt")
+	}
+	log.Trace().Msgf("Encrypting completed: %v", obj)
+
+	var encoded string
+	if encodeOptions.Full {
+		log.Debug().Msg("Full JWT Serialization")
+		encoded = obj.FullSerialize()
 	} else {
-		msg, err := obj.CompactSerialize()
+		log.Debug().Msg("Compact JWT Serialization")
+		encoded, err = obj.CompactSerialize()
 		if err != nil {
-			log.Fatalf("unable to serialize message: %v", err)
+			log.Fatal().Err(err).Msg("unable to serialize message")
 		}
-		return msg
 	}
+	log.Debug().Msg("JWT encoded with success !!!")
+	return encoded
+}
+
+func Decode(payload string, encodeOptions EncodeOptions, signOptions SignOptions) string {
+
+	log.Debug().Msgf("Decode with options: %v", encodeOptions)
+
+	encryptedData, err1 := jose.ParseEncrypted(payload)
+	log.Trace().Msgf("encryptedData: %v", encryptedData)
+	if err1 != nil {
+		log.Fatal().Err(err1).Msg("Unable to parse payload")
+	}
+
+	data, err2 := encryptedData.Decrypt(encodeOptions.Key)
+	if err2 != nil {
+		log.Fatal().Err(err2).Msg("Unable to decrypt message")
+	}
+	plaintext := string(data)
+	log.Trace().Msgf("plaintext: %v", plaintext)
+
+	if encodeOptions.Sign {
+		return Sign(plaintext, signOptions)
+	}
+
+	log.Debug().Msg("JWT decoded with success !!!")
+
+	return plaintext
 }
