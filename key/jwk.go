@@ -3,17 +3,21 @@ package key
 import (
 	"encoding/json"
 	"errors"
-	"log"
-	"os"
 
 	jose "github.com/go-jose/go-jose/v3"
 )
 
-func LoadJSONWebKey(json []byte, pub bool) (*jose.JSONWebKey, error) {
-	var jwk jose.JSONWebKey
-	err := jwk.UnmarshalJSON(json)
+func LoadJSONWebKey(json []byte, pub bool, kid string) (*jose.JSONWebKey, error) {
+	var key jose.JSONWebKey
+	var jwk *jose.JSONWebKey
+	err := key.UnmarshalJSON(json)
 	if err != nil {
-		return nil, err
+		jwk, _ = LoadJSONWebKeySet(json, kid)
+	} else {
+		jwk = &key
+	}
+	if jwk == nil {
+		return nil, errors.New("JWK key parse error")
 	}
 	if !jwk.Valid() {
 		return nil, errors.New("invalid JWK key")
@@ -21,22 +25,22 @@ func LoadJSONWebKey(json []byte, pub bool) (*jose.JSONWebKey, error) {
 	if jwk.IsPublic() != pub {
 		return nil, errors.New("priv/pub JWK key mismatch")
 	}
-	return &jwk, nil
+	return jwk, nil
 }
 
-func LoadJSONWebKeySet(filename string, kid string) []jose.JSONWebKey {
-	jwkBytes, err := os.ReadFile(filename)
-	if err != nil {
-		log.Fatalf("unable to read jwk set file: %v", err)
-	}
+func LoadJSONWebKeySet(jwkBytes []byte, kid string) (*jose.JSONWebKey, error) {
 	var jwkSet jose.JSONWebKeySet
-	err = json.Unmarshal(jwkBytes, &jwkSet)
+	err := json.Unmarshal(jwkBytes, &jwkSet)
 	if err != nil {
-		log.Fatalf("unable to decode jwks: %v", err)
+		return nil, err
 	}
+	keys := jwkSet.Keys
 	if len(kid) > 0 {
-		return jwkSet.Keys
+		keys = jwkSet.Key(kid)
+	}
+	if len(keys) > 0 {
+		return &keys[0], nil
 	} else {
-		return jwkSet.Key(kid)
+		return nil, errors.New("no keys found in jwk")
 	}
 }

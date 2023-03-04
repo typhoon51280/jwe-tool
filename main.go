@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/typhoon51280/jwe-tool/crypto"
 	"github.com/typhoon51280/jwe-tool/ioutil"
 	"github.com/typhoon51280/jwe-tool/key"
 
@@ -14,9 +15,11 @@ import (
 )
 
 var flgOp = flag.String("command", "decrypt", "encrypt|decrypt|verify|sign")
-var privateKeyPath = flag.String("key", "", "private key path")
+var privateKeyPath = flag.String("encKey", "", "private enc key path")
 var token = flag.String("token", "", "token")
-var publicKeyPath = flag.String("pub", "", "public key path")
+var publicKeyPath = flag.String("encPub", "", "public enc key path")
+var signPrivateKeyPath = flag.String("sigKey", "", "private sign key path")
+var signPublicKeyPath = flag.String("sigPub", "", "public sign key path")
 var jwksPath = flag.String("jwks", "", "JWKS file path")
 var kid = flag.String("kid", "PROSPECT", "Key ID")
 var inFile = flag.String("in", "", "output file path")
@@ -59,6 +62,7 @@ func decrypt() {
 	}
 
 	encryptedData, err := jose.ParseEncrypted(data)
+	fmt.Printf("encryptedData: %v", encryptedData)
 	if err != nil {
 		log.Fatalf("unable to parse message: %v", err)
 	}
@@ -83,47 +87,30 @@ func decrypt() {
 
 func encrypt() {
 
-	pub, err := key.LoadPublicKey(*publicKeyPath)
+	var pub interface{}
+	pub, err := key.LoadPublicKey(*publicKeyPath, *kid)
 	if err != nil {
-		fmt.Printf("unable to read public key: %v\n", err)
+		log.Fatalf("%v", err)
 	}
-
-	alg := jose.KeyAlgorithm(*encryptAlgFlag)
-	enc := jose.ContentEncryption(*encryptEncFlag)
-
-	// fmt.Printf("alg: %s\n", alg)
-	// fmt.Printf("pub: %s\n", pub)
-	// fmt.Printf("enc: %s\n", enc)
-
-	crypter, err := jose.NewEncrypter(enc, jose.Recipient{Algorithm: alg, Key: pub}, nil)
+	// if len(*jwksPath) > 0 {
+	// 	data := key.LoadJSONWebKeySet(*jwksPath, *kid)
+	// 	if len(data) > 0 {
+	// 		pub = data[0].Public().Key
+	// 	}
+	// } else {
+	// 	data, err := key.LoadPublicKey(*publicKeyPath)
+	// 	if err != nil {
+	// 		fmt.Printf("unable to read public key: %v\n", err)
+	// 	}
+	// 	pub = data
+	// }
+	input, err := os.ReadFile(*inFile)
 	if err != nil {
-		fmt.Printf("unable to instantiate encrypter: %v\n", err)
-		os.Exit(1)
+		log.Fatalf("unable to read json file: %v", err)
 	}
 
-	jsonBytes, err := os.ReadFile(*inFile)
-	if err != nil {
-		fmt.Printf("unable to read json file: %v", err)
-		os.Exit(1)
-	}
-
-	obj, err := crypter.Encrypt(jsonBytes)
-	if err != nil {
-		fmt.Printf("unable to encrypt: %v", err)
-		os.Exit(1)
-	}
-
-	var msg string
-	if *encryptFullFlag {
-		msg = obj.FullSerialize()
-	} else {
-		msg, err = obj.CompactSerialize()
-		if err != nil {
-			fmt.Printf("unable to serialize message: %v", err)
-			os.Exit(1)
-		}
-	}
-	ioutil.WriteOutput(*outFile, []byte(msg))
+	output := crypto.Encode(input, pub, *encryptAlgFlag, *encryptEncFlag, *encryptFullFlag)
+	ioutil.WriteOutput(*outFile, []byte(output))
 }
 
 func sign() {
@@ -131,29 +118,17 @@ func sign() {
 	if err != nil {
 		log.Fatalf("Error load payload: %v", err)
 	}
-	privateKey, err := key.LoadPrivateKey(*privateKeyPath)
+	privateKey, err := key.LoadPrivateKey(*signPrivateKeyPath)
 	if err != nil {
 		log.Fatalf("Error load private key: %v", err)
 	}
-	alg := jose.SignatureAlgorithm(*signAlgFlag)
-	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: alg, Key: privateKey}, nil)
-	if err != nil {
-		log.Fatalf("Signer not created: %v", err)
-	}
-	object, err := signer.Sign(payload)
-	if err != nil {
-		log.Fatalf("Error sign  %v", err)
-	}
-	serialized, err := object.CompactSerialize()
-	if err != nil {
-		log.Fatalf("Error serialization  %v", err)
-	}
+	serialized := crypto.Sign(payload, privateKey, *signAlgFlag)
 	ioutil.WriteOutput(*outFile, []byte(serialized))
 }
 
 func verify() {
 	jws := ioutil.LoadInput(*inFile)
-	publicKey, err := key.LoadPublicKey(*publicKeyPath)
+	publicKey, err := key.LoadPublicKey(*publicKeyPath, "")
 	if err != nil {
 		log.Fatalf("Error reading private key: %v", err)
 	}
