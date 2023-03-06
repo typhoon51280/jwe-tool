@@ -1,74 +1,66 @@
 package crypto
 
 import (
-	"strings"
+	"encoding/json"
+	"time"
 
-	"github.com/go-jose/go-jose/v3"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/rs/zerolog/log"
 )
 
 type SignOptions struct {
-	Algorithm string
-	Key       interface{}
-	Full      bool
+	Algorithm  string
+	PrivateKey interface{}
+	PublicKey  interface{}
+	Kid        string
+	Duration   string
 }
 
-func Sign(payload string, signOptions SignOptions) string {
+func Sign(payload string, signOptions SignOptions) (string, jwt.Token) {
 
-	log.Debug().Msgf("Sign with options: %+v", signOptions)
+	log.Debug().Msgf("Signing with options: %#v", signOptions)
 
-	signKey := jose.SigningKey{
-		Algorithm: jose.SignatureAlgorithm(signOptions.Algorithm),
-		Key:       signOptions.Key,
+	var claims jwt.MapClaims
+	if err := json.Unmarshal([]byte(payload), &claims); err != nil {
+		log.Fatal().Err(err).Msg("Error during payload unmarshall")
 	}
-	signerOptions := jose.SignerOptions{
-		EmbedJWK: false,
-	}
-	signer, err := jose.NewSigner(signKey, &signerOptions)
+	duration, err := time.ParseDuration(signOptions.Duration)
 	if err != nil {
-		log.Fatal().Err(err).Msg("unable to instantiate signer")
+		log.Warn().Msgf("Token duration %s not valid, reset to 1h", signOptions.Duration)
+		duration = time.Hour
 	}
-	log.Trace().Msgf("JWT Signer: %+v", signer)
+	now := time.Now()
+	nowEpoch := now.Unix()
+	claims["iat"] = nowEpoch
+	claims["nbf"] = nowEpoch
+	claims["exp"] = now.Add(duration).Unix()
+	token := jwt.NewWithClaims(jwt.GetSigningMethod(signOptions.Algorithm), claims)
+	if signOptions.Kid != "" {
+		token.Header["kid"] = signOptions.Kid
+	}
 
-	signedPayload, err := signer.Sign([]byte(payload))
+	log.Trace().Msgf("Signing token %#v ...", token)
+
+	tokenData, err := token.SignedString(signOptions.PrivateKey)
 	if err != nil {
-		log.Fatal().Err(err).Msg("unable to sign")
+		log.Fatal().Err(err).Msg("Error signing Token")
 	}
+	log.Info().Msg("Signed Token with success.")
 
-	var serialized string
-	if signOptions.Full {
-		log.Trace().Msg("Full JWT serialization")
-		serialized = signedPayload.FullSerialize()
-	} else {
-		log.Trace().Msg("Compact JWT serialization")
-		if serialized, err = signedPayload.CompactSerialize(); err != nil {
-			log.Fatal().Err(err).Msg("unable to serialize message")
-		}
-	}
-	log.Debug().Msg("JWT signature verified OK")
-	return serialized
-
+	return tokenData, *token
 }
 
-func Verify(payload string, signOptions SignOptions) string {
+func Verify(payload string, signOptions SignOptions) jwt.Token {
 
 	log.Debug().Msgf("Verify with options: %#v", signOptions)
 
-	jwtSigned, err := jose.ParseSigned(payload)
+	token, err := jwt.Parse(payload, func(t *jwt.Token) (interface{}, error) {
+		return signOptions.PublicKey, nil
+	})
 	if err != nil {
-		log.Fatal().Err(err).Msg("Error parsing jwt")
+		log.Warn().Err(err).Msg("Verification Token failed")
+	} else {
+		log.Info().Msg("Verified Token with success.")
 	}
-	log.Trace().Msgf("JWT Signed: %s", jwtSigned.FullSerialize())
-
-	jwtVerified, err := jwtSigned.Verify(signOptions.Key)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Error verifying jwt")
-	}
-	plaintext := string(jwtVerified)
-	plaintext = strings.Replace(plaintext, "\r", "", -1)
-	plaintext = strings.Replace(plaintext, "\n", "", -1)
-	log.Trace().Msgf("JWT Verified: %s", plaintext)
-	log.Info().Msg("JWT verified with success !!!")
-
-	return plaintext
+	return *token
 }

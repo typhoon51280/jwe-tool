@@ -2,30 +2,28 @@ package crypto
 
 import (
 	"github.com/go-jose/go-jose/v3"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/rs/zerolog/log"
 )
 
 type EncodeOptions struct {
-	Algorithm string
-	Encoding  string
-	Full      bool
-	Sign      bool
-	Key       interface{}
+	Algorithm  string
+	Encoding   string
+	PrivateKey interface{}
+	PublicKey  interface{}
 }
 
-func Encode(payload string, encodeOptions EncodeOptions, signOptions SignOptions) string {
+func Encode(payload string, encodeOptions EncodeOptions, signOptions SignOptions) (string, jwt.Token) {
 
 	log.Debug().Msgf("Encode with options: %+v", encodeOptions)
 
-	if encodeOptions.Sign {
-		payload = Sign(payload, signOptions)
-	}
+	tokenData, token := Sign(payload, signOptions)
 
 	alg := jose.KeyAlgorithm(encodeOptions.Algorithm)
 	enc := jose.ContentEncryption(encodeOptions.Encoding)
 	recpt := jose.Recipient{
 		Algorithm: alg,
-		Key:       encodeOptions.Key,
+		Key:       encodeOptions.PublicKey,
 	}
 	encrypterOptions := jose.EncrypterOptions{}
 
@@ -35,49 +33,40 @@ func Encode(payload string, encodeOptions EncodeOptions, signOptions SignOptions
 	}
 	log.Trace().Msgf("Encrypter created: %+v", crypter)
 
-	obj, err := crypter.Encrypt([]byte(payload))
+	obj, err := crypter.Encrypt([]byte(tokenData))
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to encrypt")
 	}
 	log.Trace().Msgf("Encrypting completed: %+v", obj.FullSerialize())
 
-	var encoded string
-	if encodeOptions.Full {
-		log.Debug().Msg("Full JWT Serialization")
-		encoded = obj.FullSerialize()
-	} else {
-		log.Debug().Msg("Compact JWT Serialization")
-		encoded, err = obj.CompactSerialize()
-		if err != nil {
-			log.Fatal().Err(err).Msg("unable to serialize message")
-		}
+	encodedData, err := obj.CompactSerialize()
+	if err != nil {
+		log.Fatal().Err(err).Msg("unable to serialize message")
 	}
 	log.Info().Msg("JWT encoded with success !!!")
-	return encoded
+	return encodedData, token
 }
 
-func Decode(payload string, encodeOptions EncodeOptions, signOptions SignOptions) string {
+func Decode(payload string, encodeOptions EncodeOptions, signOptions SignOptions) (string, jwt.Token) {
 
-	log.Debug().Msgf("Decode with options: %v", encodeOptions)
+	log.Debug().Msgf("Decode with options: %#v", encodeOptions)
 
-	encryptedData, err1 := jose.ParseEncrypted(payload)
-	if err1 != nil {
-		log.Fatal().Err(err1).Msg("Unable to parse payload")
+	encryptedData, err := jose.ParseEncrypted(payload)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("Unable to parse payload: %s", payload)
 	}
-	log.Debug().Msg("Parsed encrypted data")
+	// log.Debug().Msgf("Parsed encrypted data: %#v", encryptedData)
 
-	data, err2 := encryptedData.Decrypt(encodeOptions.Key)
-	if err2 != nil {
-		log.Fatal().Err(err2).Msg("Unable to decrypt message")
+	data, err := encryptedData.Decrypt(encodeOptions.PrivateKey)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("Unable to decrypt message: %s", payload)
 	}
-	plaintext := string(data)
-	log.Trace().Msgf("plaintext: %v", plaintext)
+	decryptedData := string(data)
+	log.Trace().Msgf("decrypted data: %s", decryptedData)
 
-	if encodeOptions.Sign {
-		Verify(plaintext, signOptions)
-	}
+	token := Verify(decryptedData, signOptions)
 
-	log.Info().Msg("JWT decrypted OK")
+	log.Info().Msg("JWT decrypted with success !!!")
 
-	return plaintext
+	return decryptedData, token
 }
