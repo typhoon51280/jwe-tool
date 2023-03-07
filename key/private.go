@@ -72,6 +72,18 @@ func LoadKeyPair(data []byte, checkForPassword bool) (interface{}, interface{}, 
 		log.Trace().Err(err).Send()
 	}
 
+	log.Debug().Msg("Testing for JsonWebKey ...")
+	if jsonWebKey, err := LoadJSONWebKey(input, false); err == nil {
+		if privateKey, publicKey, err := ResolveKeyPair(jsonWebKey, false, ""); err == nil {
+			log.Debug().Msg("Found JsonWebKey")
+			return privateKey, publicKey, nil
+		} else {
+			log.Trace().Err(err).Msgf("jsonWebKey not resolved")
+		}
+	} else {
+		log.Trace().Err(err).Send()
+	}
+
 	return nil, nil, errors.New("parse error, invalid private key")
 }
 

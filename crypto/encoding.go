@@ -43,7 +43,7 @@ func Encode(payload string, encodeOptions EncodeOptions, signOptions SignOptions
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to serialize message")
 	}
-	log.Info().Msg("JWT encoded with success !!!")
+	log.Info().Msg("JWT encoded with success")
 	return encodedData, token
 }
 
@@ -66,7 +66,7 @@ func Decode(payload string, encodeOptions EncodeOptions, signOptions SignOptions
 
 	token := Verify(decryptedData, signOptions)
 
-	log.Info().Msg("JWT decrypted with success !!!")
+	log.Info().Msg("JWT decrypted with success")
 
 	return decryptedData, token
 }

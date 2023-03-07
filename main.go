@@ -15,7 +15,7 @@ var flgOp = flag.String("command", "decrypt", "encrypt|decrypt|verify|sign")
 var token = flag.String("token", "", "token")
 var encKeyPath = flag.String("enc", "", "encrypt key path")
 var sigKeyPath = flag.String("sig", "", "sign key path")
-var kid = flag.String("kid", "PROSPECT", "Key ID")
+var kid = flag.String("kid", "", "Key ID")
 var inFile = flag.String("in", "", "output file path")
 var outFile = flag.String("out", "", "output file path")
 var encryptCypher = flag.String("cypher", "A128GCM", "encrypt cypher")
@@ -97,7 +97,7 @@ func decrypt() {
 
 	encOptions := createEncOptions(encPrivateKey, encPublicKey)
 	sigKeyBytes := ioutil.LoadInput(*sigKeyPath)
-	sigPublicKey, err := key.LoadPublicKey(sigKeyBytes, *kid, true)
+	sigPublicKey, err := key.LoadPublicKey(sigKeyBytes, true)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("Error loading sign public key %v", *sigKeyPath)
 	}
@@ -108,7 +108,7 @@ func decrypt() {
 	log.Info().Msgf("JWT Parsed |-\n%s", ioutil.PrintJWT(token, signOptions.PublicKey))
 
 	if len(*outFile) > 0 {
-		ioutil.WriteOutput(*outFile, plaintext)
+		ioutil.WriteOutput(*outFile, ioutil.PrettyJSON(token.Claims))
 	}
 
 	log.Info().Msg("DONE 😀")
@@ -128,9 +128,9 @@ func encrypt() {
 	input := ioutil.LoadInputStr(*inFile)
 
 	encKeyBytes := ioutil.LoadInput(*encKeyPath)
-	encPublicKey, err := key.LoadPublicKey(encKeyBytes, *kid, true)
+	encPublicKey, err := key.LoadPublicKey(encKeyBytes, true)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("Error loading encrypt public key %v %v", *encKeyPath, kid)
+		log.Fatal().Err(err).Msgf("Error loading encrypt public key %v", *encKeyPath)
 	}
 	log.Debug().Msgf("Encrypt Public Key Loaded")
 
@@ -203,9 +203,9 @@ func verify() {
 	input := ioutil.LoadInputStr(*inFile)
 
 	sigKeyBytes := ioutil.LoadInput(*sigKeyPath)
-	sigPublicKey, err := key.LoadPublicKey(sigKeyBytes, *kid, true)
+	sigPublicKey, err := key.LoadPublicKey(sigKeyBytes, true)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("Error loading sign public key %v %v", *sigKeyPath, *kid)
+		log.Fatal().Err(err).Msgf("Error loading sign public key %v", *sigKeyPath)
 	}
 	log.Info().Msg("Sign Public Key Loaded")
 
