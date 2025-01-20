@@ -96,12 +96,15 @@ func decrypt() {
 	log.Debug().Msgf("Decrypt Private Key Loaded")
 
 	encOptions := createEncOptions(encPrivateKey, encPublicKey)
-	sigKeyBytes := ioutil.LoadInput(*sigKeyPath)
-	sigPublicKey, err := key.LoadPublicKey(sigKeyBytes, true)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("Error loading sign public key %v", *sigKeyPath)
+	signOptions := crypto.SignOptions{};
+	if len(*sigKeyPath) > 0 {
+		sigKeyBytes := ioutil.LoadInput(*sigKeyPath)
+		sigPublicKey, err := key.LoadPublicKey(sigKeyBytes, true)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("Error loading sign public key %v", *sigKeyPath)
+		}
+		signOptions = createSignOptions(nil, sigPublicKey)
 	}
-	signOptions := createSignOptions(nil, sigPublicKey)
 
 	plaintext, token := crypto.Decode(input, encOptions, signOptions)
 	log.Info().Msgf("JWT Serialized |-\n%s", ioutil.PrintText("JWT", plaintext, color.BgCyan, color.FgWhite, color.Bold))
